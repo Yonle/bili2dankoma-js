@@ -24,21 +24,15 @@ if (!Array.isArray(comments)) {
  *   [text, time, mode, timestamp, color, size]
  *
  *   text      = comment text
- *   time      = video playback position, seconds
- *   mode      = Dankoma rendering mode
- *   timestamp = source comment timestamp, Unix seconds
+ *   time      = video position, seconds
+ *   mode      = Dankoma mode
+ *   timestamp = original comment posting time, Unix seconds
  *   color     = 0xRRGGBB
- *   size      = font size in pixels
- *
- * `vposMs` is the comment's position in the video.
- * `postedAt` is only the wall-clock time at which the comment
- * was posted, so it must NEVER be used for playback ordering.
+ *   size      = font size
  */
 
 /*
  * Niconico color names -> 0xRRGGBB
- *
- * Includes normal and premium color aliases.
  */
 const COLORS = {
     white:          0xffffff,
@@ -79,23 +73,20 @@ const COLORS = {
     black2:         0x666666,
 };
 
-/*
- * Dankoma defaults.
- *
- * `25` is Dankoma's default font size.
- * Niconico's explicit `medium` command is 24px.
- */
-const DEFAULT_MODE = 1;       // naka / scrolling
-const DEFAULT_SIZE = 25;
+const DEFAULT_MODE = 1;       // naka
+const DEFAULT_SIZE = 24;      // medium
 const DEFAULT_COLOR = 0xffffff;
 
 /*
- * Parse Niconico's `commands` array.
+ * Parse Niconico's presentation commands.
  *
- * Only visual/presentation commands are translated.
- * Metadata commands such as `184` and `device:*` are ignored.
+ * Metadata commands such as:
+ *   184
+ *   device:PC
+ *   device:3DS
+ *   @96
  *
- * Later presentation commands override earlier ones.
+ * are not rendering commands and are ignored.
  */
 function parseCommands(commands) {
     let mode = DEFAULT_MODE;
@@ -117,60 +108,51 @@ function parseCommands(commands) {
              */
             case "naka":
                 mode = 1;
-                continue;
+                break;
 
             case "ue":
                 mode = 5;
-                continue;
+                break;
 
             case "shita":
                 mode = 4;
-                continue;
+                break;
 
             /*
              * Font size.
              */
             case "big":
                 size = 36;
-                continue;
+                break;
 
             case "medium":
                 size = 24;
-                continue;
+                break;
 
             case "small":
                 size = 12;
-                continue;
-        }
+                break;
 
-        /*
-         * Color.
-         */
-        if (Object.hasOwn(COLORS, command)) {
-            color = COLORS[command];
+            default:
+                if (Object.hasOwn(COLORS, command)) {
+                    color = COLORS[command];
+                }
+                break;
         }
-
-        /*
-         * Everything else is intentionally ignored:
-         *
-         *   184
-         *   device:PC
-         *   device:3DS
-         *   ...
-         */
     }
 
     return { mode, size, color };
 }
 
 /*
- * Validate and normalize comments before sorting.
+ * Build normalized records first.
  *
- * This avoids sorting records that are going to be discarded anyway.
+ * `vposMs` is already the video's playback position in milliseconds.
+ * Do NOT derive it from `postedAt`.
  */
 const records = [];
 
-for (const comment of comments) {
+for (const [index, comment] of comments.entries()) {
     const vposMs = Number(comment?.vposMs);
 
     if (!Number.isFinite(vposMs) || vposMs < 0) {
@@ -185,6 +167,11 @@ for (const comment of comments) {
 
     const postedAtMs = Date.parse(comment?.postedAt);
 
+    /*
+     * postedAt is metadata for record[3].
+     *
+     * It is NOT used for video timing.
+     */
     if (!Number.isFinite(postedAtMs)) {
         continue;
     }
@@ -192,22 +179,42 @@ for (const comment of comments) {
     const { mode, size, color } = parseCommands(comment?.commands);
 
     records.push({
+        text,
         vposMs,
         postedAtMs,
-        text,
         mode,
         size,
         color,
+
+        /*
+         * Keep source order as a final tie-breaker.
+         *
+         * `no` is preferable when available because it represents the
+         * comment's sequence number in the video.
+         */
+        no: Number.isFinite(Number(comment?.no))
+            ? Number(comment.no)
+            : index,
     });
 }
 
 /*
- * Sort by playback position.
+ * Playback order:
  *
- * Modern Node.js Array#sort() is stable, so comments with identical
- * vposMs retain their original source order.
+ *   1. video position
+ *   2. Niconico comment number
+ *
+ * This handles multiple comments sharing exactly the same vposMs.
  */
-records.sort((a, b) => a.vposMs - b.vposMs);
+records.sort((a, b) => {
+    const timeDiff = a.vposMs - b.vposMs;
+
+    if (timeDiff !== 0) {
+        return timeDiff;
+    }
+
+    return a.no - b.no;
+});
 
 /*
  * Emit Dankoma JSONL.
