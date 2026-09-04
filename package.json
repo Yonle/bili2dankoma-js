@@ -1,0 +1,22 @@
+{
+  "name": "bili2dankoma",
+  "version": "0.0.0",
+  "description": "Collection of danmaku converter to DankomaJSONL compatible",
+  "main": "bili2dankoma.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yonle/bili2dankoma-js.git"
+  },
+  "author": "Yonle <yonle@proton.me>",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/Yonle/bili2dankoma-js/issues"
+  },
+  "homepage": "https://github.com/Yonle/bili2dankoma-js#readme",
+  "dependencies": {
+    "protobufjs": "^8.8.0"
+  }
+}
