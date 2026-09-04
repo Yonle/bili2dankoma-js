@@ -7,8 +7,9 @@ bili-cli JSONL danmaku converter to dankoma.js JSONL
 ./bili2dankoma.js < bilibili.jsonl > dankoma.jsonl
 ```
 
-or with [bilibili-cli](https://github.com/tamnd/bilibili-cli):
+For legacy danmaku (that has `/n`, These can be fixed with `legacyfix.js`:
+
 
 ```
-bili danmaku BV1GJ411x7h7 -o jsonl | ./bili2dankoma.js > danma.jsonl
+./bili2dankoma.js < legacy-bilibili.jsonl | ./legacyfix.js > dankoma.jsonl
 ```
